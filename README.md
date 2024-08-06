@@ -72,3 +72,4 @@ REGION={aws_region}
 LB={arn_of_your_alb}
 for i in  $(aws elbv2 describe-target-groups --load-balancer-arn $LB  --region $REGION | jq -r '.TargetGroups[].TargetGroupArn'); do aws elbv2 describe-target-health --target-group-arn $i --region $REGION; done
 ```
+# awslab1
