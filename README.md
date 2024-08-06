@@ -1,17 +1,3 @@
-# Content
-
-  * [Problem statement](#problem)
-  * [Solution approach](#solution)
-  * [Pre-requirements](#prereq)
-  * [Hands-on labs](#handson)
-  * [Definition of done](#dod)
-
-
-# Problem statement <a name="problem"></a>
-
-Application solution requires high available and secure setup on AWS using DataBase, Filesystem and Compute services.
-
-
 # Solutioning approach <a name="solution"></a>
 
 - Use EFS for sharing data between compute instances 
@@ -55,21 +41,3 @@ You can do this task following the step-by-step instructions or you can provisio
 
 - Activated AWS account
 - All modules from CloudX AWS DevOps course completed
-
-# Hands-on labs <a name="handson"></a>
-
-- [Task 1: Basic Infrastructure; EC2, VPC, EFS](./task1_basic_infra.md)
-- [Task 2: Infrastructure as code; Terraform, CloudFormation, SDK](./task2_iac.md)
-- [Task 3: External DataBase; RDS, KMS](./task3_db.md)
-- [Task 4: Second target group; ECS, ECR](./task4_ecs.md)
-- [Task 5: Monitoring and more; Cloudwatch](./task5_monitoring.md)
-
-## Definition of done <a name="dod"></a>
-
-Your soulition should be implemented according to requirements in [Solution approach](#solution). You should provide the output of the following script as the proof of working solution:
-```
-REGION={aws_region}
-LB={arn_of_your_alb}
-for i in  $(aws elbv2 describe-target-groups --load-balancer-arn $LB  --region $REGION | jq -r '.TargetGroups[].TargetGroupArn'); do aws elbv2 describe-target-health --target-group-arn $i --region $REGION; done
-```
-# awslab1
