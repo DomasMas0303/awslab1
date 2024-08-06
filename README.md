@@ -37,8 +37,8 @@ You can do this task following the step-by-step instructions or you can provisio
 - Logs should be aggregated from all sources to CloudWatch Group/Logs 
 - All metrics should be arranged into CloudWatch Dashboard 
 
+<img width="1273" alt="image" src="https://github.com/user-attachments/assets/786f0d3d-0410-4dd8-a9dd-9230bcc53196">
+<img width="986" alt="image" src="https://github.com/user-attachments/assets/8925e5ec-133d-4050-9694-e35552fce4fe">
+<img width="1392" alt="image" src="https://github.com/user-attachments/assets/90f46791-69ad-418a-9f8e-10b60c5d757c">
 
-# Pre-requirements <a name="prereq"></a>
 
-- Activated AWS account
-- All modules from CloudX AWS DevOps course completed
