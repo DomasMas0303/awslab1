@@ -20,7 +20,7 @@ You can do this task following the step-by-step instructions or you can provisio
 
 
 ## Reference Infrastructure Diagram: 
-![chart](./images/FullInfrastructure.png)
+
 
 
 ## Minimum observability requirements: 
