@@ -1,4 +1,4 @@
-# Solutioning approach <a name="solution"></a>
+# Solution approach <a name="solution"></a>
 
 - Use EFS for sharing data between compute instances 
 - Use ASG and Fargate for application reliability across compute engines 
