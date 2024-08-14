@@ -1,18 +1,15 @@
 #!/bin/bash -xe
 exec > >(tee /var/log/cloud-init-output.log | logger -t user-data -s 2>/dev/console) 2>&1
 
-# Update this to match your ALB DNS name
-LB_DNS_NAME='ghost-alb-377763628.eu-central-1.elb.amazonaws.com'
-
-# Get the region from the instance metadata
-REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/[a-z]$//')
-
-# Set your EFS ID 
-EFS_ID=$(aws efs describe-file-systems --query 'FileSystems[?Name==`ghost_content`].FileSystemId' --region $REGION --output text)
+# Get values
+LB_DNS_NAME="${LB_DNS_NAME}"
+EFS_ID="${EFS_ID}"
+REGION="${REGION}"
 
 # Log the values for debugging
 echo "REGION: $REGION"
 echo "EFS_ID: $EFS_ID"
+echo "LB_DNS_NAME: $LB_DNS_NAME"
 
 # Install pre-reqs
 curl -sL https://rpm.nodesource.com/setup_14.x | sudo bash -
@@ -52,6 +49,15 @@ else
     echo "Content directory already exists in EFS"
 fi
 
+# Create themes directory in EFS if it doesn't exist
+if [ ! -d "$EFS_MOUNT_DIR/content/themes" ]; then
+    mkdir -p $EFS_MOUNT_DIR/content/themes
+    chown -R ghost_user:ghost_user $EFS_MOUNT_DIR/content/themes
+    echo "Created themes directory in EFS"
+else
+    echo "Themes directory already exists in EFS"
+fi
+
 # Check if logs directory exists, create if it doesn't
 if [ ! -d "$EFS_MOUNT_DIR/content/logs" ]; then
     mkdir -p $EFS_MOUNT_DIR/content/logs
@@ -76,6 +82,9 @@ if [ ! -d "$EFS_MOUNT_DIR/content/themes/casper" ]; then
 else
     echo "Casper theme already exists in EFS"
 fi
+
+# Ensure proper permissions for the entire content directory
+chown -R ghost_user:ghost_user $EFS_MOUNT_DIR/content
 
 # Create Ghost config
 cat << EOF > $INSTALL_DIR/config.production.json
