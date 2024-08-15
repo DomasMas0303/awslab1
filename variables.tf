@@ -1,6 +1,6 @@
 variable "region" {
   description = "AWS region to create resources in"
-  default     = "eu-west-2"
+  default     = "eu-central-1"
 }
 
 variable "vpc_cidr" {
@@ -30,5 +30,5 @@ variable "asg_min_size" {
 
 variable "asg_max_size" {
   description = "Maximum size for Auto Scaling Group"
-  default     = 5
+  default     = 3
 }
