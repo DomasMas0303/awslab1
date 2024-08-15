@@ -6,11 +6,6 @@ LB_DNS_NAME="${LB_DNS_NAME}"
 EFS_ID="${EFS_ID}"
 REGION="${REGION}"
 
-# Log the values for debugging
-echo "REGION: $REGION"
-echo "EFS_ID: $EFS_ID"
-echo "LB_DNS_NAME: $LB_DNS_NAME"
-
 # Install pre-reqs
 curl -sL https://rpm.nodesource.com/setup_14.x | sudo bash -
 yum install -y nodejs amazon-efs-utils
@@ -20,7 +15,7 @@ npm install ghost-cli@latest -g
 adduser ghost_user
 usermod -aG wheel ghost_user
 
-# Create a unique directory for this installation
+# Create a unique directory for installation
 INSTALL_DIR="/home/ghost_user/ghost-install-$(date +%Y%m%d%H%M%S)"
 mkdir -p $INSTALL_DIR
 chown ghost_user:ghost_user $INSTALL_DIR
