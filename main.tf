@@ -27,6 +27,18 @@ resource "aws_subnet" "public" {
   }
 }
 
+# Create the private subnets for DB
+resource "aws_subnet" "private_db" {
+  count             = 3
+  vpc_id            = aws_vpc.cloudx.id
+  cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index + 20)
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+
+  tags = {
+    Name = "private_db_${substr(data.aws_availability_zones.available.names[count.index], -1, 1)}"
+  }
+}
+
 # Create the Internet gateway
 resource "aws_internet_gateway" "cloudx_igw" {
   vpc_id = aws_vpc.cloudx.id
@@ -55,6 +67,22 @@ resource "aws_route_table_association" "public" {
   count          = 3
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
+}
+
+# Create the private routing table
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.cloudx.id
+
+  tags = {
+    Name = "private_rt"
+  }
+}
+
+# Associate the private subnets with the private routing table
+resource "aws_route_table_association" "private" {
+  count          = 3
+  subnet_id      = aws_subnet.private_db[count.index].id
+  route_table_id = aws_route_table.private.id
 }
 
 # Create the security groups
@@ -138,6 +166,26 @@ resource "aws_security_group" "efs" {
   }
 }
 
+resource "aws_security_group" "mysql" {
+  name        = "mysql"
+  description = "defines access to ghost db"
+  vpc_id      = aws_vpc.cloudx.id
+
+  ingress {
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ec2_pool.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 resource "aws_security_group_rule" "ec2_pool_from_alb" {
   type                     = "ingress"
   from_port                = 2368
@@ -203,17 +251,15 @@ resource "aws_iam_role_policy" "ghost_app_permissions" {
           "ec2:Describe*",
           "elasticfilesystem:DescribeFileSystems",
           "elasticfilesystem:ClientMount",
-          "elasticfilesystem:ClientWrite"
+          "elasticfilesystem:ClientWrite",
+          "ssm:GetParameter*",
+          "secretsmanager:GetSecretValue",
+          "kms:Decrypt"
         ]
         Resource = "*"
       }
     ]
   })
-}
-
-resource "aws_iam_role_policy_attachment" "ghost_app_ec2_describe" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
-  role       = aws_iam_role.ghost_app.name
 }
 
 resource "aws_iam_role_policy_attachment" "ghost_app_efs_access" {
@@ -277,14 +323,6 @@ data "aws_ami" "amazon_linux_2" {
   }
 }
 
-locals {
-  user_data = templatefile("user_data.sh", {
-    LB_DNS_NAME = aws_lb.ghost.dns_name
-    EFS_ID      = aws_efs_file_system.ghost_content.id
-    REGION      = var.region
-  })
-}
-
 resource "aws_launch_template" "ghost" {
   name          = "ghost"
   instance_type = var.instance_type
@@ -299,7 +337,16 @@ resource "aws_launch_template" "ghost" {
   iam_instance_profile {
     name = aws_iam_instance_profile.ghost_app.name
   }
-  user_data = base64encode(local.user_data)
+
+  user_data = base64encode(templatefile("user_data.sh", {
+    LB_DNS_NAME     = aws_lb.ghost.dns_name
+    EFS_ID          = aws_efs_file_system.ghost_content.id
+    REGION          = var.region
+    DB_HOST         = aws_db_instance.ghost.endpoint
+    DB_NAME         = aws_db_instance.ghost.db_name
+    DB_USER         = aws_db_instance.ghost.username
+    SSM_DB_PASSWORD = aws_ssm_parameter.db_password.name
+  }))
 }
 
 # Create the Auto Scaling Group
@@ -344,4 +391,44 @@ data "http" "myip" {
 resource "aws_iam_instance_profile" "ghost_app" {
   name = "ghost_app"
   role = aws_iam_role.ghost_app.name
+}
+
+# Database subnet group
+resource "aws_db_subnet_group" "ghost" {
+  name       = "ghost"
+  subnet_ids = aws_subnet.private_db[*].id
+
+  tags = {
+    Name = "ghost database subnet group"
+  }
+}
+
+# RDS instance
+resource "aws_db_instance" "ghost" {
+  identifier           = "ghost"
+  engine               = "mysql"
+  engine_version       = "8.0"
+  instance_class       = "db.t3.micro"
+  allocated_storage    = 20
+  storage_type         = "gp2"
+  db_name              = "ghost"
+  username             = "ghost"
+  password             = aws_ssm_parameter.db_password.value
+  parameter_group_name = "default.mysql8.0"
+  skip_final_snapshot  = true
+
+  vpc_security_group_ids = [aws_security_group.mysql.id]
+  db_subnet_group_name   = aws_db_subnet_group.ghost.name
+}
+
+# Generate and store DB password
+resource "random_password" "db_password" {
+  length  = 16
+  special = false
+}
+
+resource "aws_ssm_parameter" "db_password" {
+  name  = "/ghost/dbpassw"
+  type  = "SecureString"
+  value = random_password.db_password.result
 }
