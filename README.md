@@ -37,4 +37,5 @@ You can do this task following the step-by-step instructions or you can provisio
 - Logs should be aggregated from all sources to CloudWatch Group/Logs 
 - All metrics should be arranged into CloudWatch Dashboard 
 
-<img width="1273" alt="image" src="https://github.com/user-attachments/assets/786f0d3d-0410-4dd8-a9dd-9230bcc53196">
+<img width="1251" alt="image" src="https://github.com/user-attachments/assets/79f46465-5e8a-45b0-9d7d-54c4f189d9e3">
+
