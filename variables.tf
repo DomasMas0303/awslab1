@@ -20,7 +20,7 @@ variable "instance_type" {
 
 variable "asg_desired_capacity" {
   description = "Desired capacity for Auto Scaling Group"
-  default     = 2
+  default     = 1
 }
 
 variable "asg_min_size" {
@@ -30,5 +30,5 @@ variable "asg_min_size" {
 
 variable "asg_max_size" {
   description = "Maximum size for Auto Scaling Group"
-  default     = 3
+  default     = 1
 }
