@@ -315,7 +315,11 @@ resource "aws_iam_role_policy" "ghost_app_permissions" {
           "elasticloadbalancing:RegisterTargets",
           "elasticloadbalancing:DeregisterTargets",
           "elasticloadbalancing:DescribeTargetGroups",
-          "elasticloadbalancing:DescribeLoadBalancers"
+          "elasticloadbalancing:DescribeLoadBalancers",
+          "cloudwatch:PutMetricData",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:ListMetrics",
+          "ec2:DescribeTags"
         ]
         Resource = "*"
       }
@@ -645,6 +649,47 @@ resource "aws_iam_role" "ghost_ecs" {
   })
 }
 
+resource "aws_iam_role" "cloudwatch_role" {
+  name = "cloudwatch_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudwatch.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "cloudwatch_permissions" {
+  name = "cloudwatch_permissions"
+  role = aws_iam_role.cloudwatch_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricData",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:ListMetrics",
+          "cloudwatch:PutMetricAlarm",
+          "cloudwatch:DescribeAlarms",
+          "cloudwatch:DeleteAlarms",
+          "sns:Publish"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role_policy" "ghost_ecs_permissions" {
   name = "ghost_ecs_permissions"
   role = aws_iam_role.ghost_ecs.id
@@ -677,7 +722,13 @@ resource "aws_iam_role_policy" "ghost_ecs_permissions" {
           "elasticloadbalancing:RegisterTargets",
           "elasticloadbalancing:DeregisterTargets",
           "elasticloadbalancing:DescribeTargetGroups",
-          "elasticloadbalancing:DescribeLoadBalancers"
+          "elasticloadbalancing:DescribeLoadBalancers",
+          "cloudwatch:PutMetricData",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:ListMetrics",
+          "ecs:DescribeClusters",
+          "ecs:ListServices",
+          "ecs:DescribeServices"
         ]
         Resource = "*"
       }
@@ -916,4 +967,318 @@ resource "aws_lb_listener" "ghost" {
 resource "aws_cloudwatch_log_group" "ghost" {
   name = "/ecs/ghost"
   retention_in_days = 30
+}
+
+# EC2 instances in ASG - Average CPU Utilization
+resource "aws_cloudwatch_metric_alarm" "asg_cpu_alarm" {
+  alarm_name          = "ASG-CPU-Utilization"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "80"
+  alarm_description   = "This metric monitors EC2 CPU utilization in ASG"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.ghost_ec2_pool.name
+  }
+}
+
+# ECS - Service CPU Utilization
+resource "aws_cloudwatch_metric_alarm" "ecs_cpu_alarm" {
+  alarm_name          = "ECS-Service-CPU-Utilization"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/ECS"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "80"
+  alarm_description   = "This metric monitors ECS service CPU utilization"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  
+  dimensions = {
+    ClusterName = aws_ecs_cluster.ghost.name
+    ServiceName = aws_ecs_service.ghost.name
+  }
+}
+
+# ECS - Running Tasks Count
+resource "aws_cloudwatch_metric_alarm" "ecs_tasks_alarm" {
+  alarm_name          = "ECS-Running-Tasks-Count"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "RunningTaskCount"
+  namespace           = "ECS/ContainerInsights"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "1"
+  alarm_description   = "This metric monitors the number of running ECS tasks"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  
+  dimensions = {
+    ClusterName = aws_ecs_cluster.ghost.name
+  }
+}
+
+# EFS - Client Connections
+resource "aws_cloudwatch_metric_alarm" "efs_connections_alarm" {
+  alarm_name          = "EFS-Client-Connections"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "ClientConnections"
+  namespace           = "AWS/EFS"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "100"
+  alarm_description   = "This metric monitors the number of EFS client connections"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  
+  dimensions = {
+    FileSystemId = aws_efs_file_system.ghost_content.id
+  }
+}
+
+# EFS - Storage Bytes in MB
+resource "aws_cloudwatch_metric_alarm" "efs_storage_alarm" {
+  alarm_name          = "EFS-Storage-Bytes"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "StorageBytes"
+  namespace           = "AWS/EFS"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "5000000000"  # 5 GB in bytes
+  alarm_description   = "This metric monitors EFS storage usage"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  
+  dimensions = {
+    FileSystemId = aws_efs_file_system.ghost_content.id
+  }
+}
+
+# RDS - Database Connections
+resource "aws_cloudwatch_metric_alarm" "rds_connections_alarm" {
+  alarm_name          = "RDS-Database-Connections"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "DatabaseConnections"
+  namespace           = "AWS/RDS"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "100"
+  alarm_description   = "This metric monitors the number of database connections"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.ghost.id
+  }
+}
+
+# RDS - CPU Utilization
+resource "aws_cloudwatch_metric_alarm" "rds_cpu_alarm" {
+  alarm_name          = "RDS-CPU-Utilization"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/RDS"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "80"
+  alarm_description   = "This metric monitors RDS CPU utilization"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.ghost.id
+  }
+}
+
+# RDS - Storage Read IOPS
+resource "aws_cloudwatch_metric_alarm" "rds_read_iops_alarm" {
+  alarm_name          = "RDS-Read-IOPS"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "ReadIOPS"
+  namespace           = "AWS/RDS"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "500"
+  alarm_description   = "This metric monitors RDS read IOPS"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.ghost.id
+  }
+}
+
+# RDS - Storage Write IOPS
+resource "aws_cloudwatch_metric_alarm" "rds_write_iops_alarm" {
+  alarm_name          = "RDS-Write-IOPS"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "WriteIOPS"
+  namespace           = "AWS/RDS"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "500"
+  alarm_description   = "This metric monitors RDS write IOPS"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.ghost.id
+  }
+}
+
+# SNS Topic for alarms
+resource "aws_sns_topic" "alarms" {
+  name = "cloudwatch-alarms"
+}
+
+resource "aws_cloudwatch_dashboard" "ghost" {
+  dashboard_name = "Ghost-Dashboard"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 12
+        height = 6
+
+        properties = {
+          metrics = [
+            ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", aws_autoscaling_group.ghost_ec2_pool.name]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = var.region
+          title   = "EC2 ASG - CPU Utilization"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 0
+        width  = 12
+        height = 6
+
+        properties = {
+          metrics = [
+            ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.ghost.name, "ServiceName", aws_ecs_service.ghost.name]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = var.region
+          title   = "ECS - Service CPU Utilization"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 6
+        width  = 12
+        height = 6
+
+        properties = {
+          metrics = [
+            ["ECS/ContainerInsights", "RunningTaskCount", "ClusterName", aws_ecs_cluster.ghost.name]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = var.region
+          title   = "ECS - Running Tasks Count"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 6
+        width  = 12
+        height = 6
+
+        properties = {
+          metrics = [
+            ["AWS/EFS", "ClientConnections", "FileSystemId", aws_efs_file_system.ghost_content.id]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = var.region
+          title   = "EFS - Client Connections"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 12
+        width  = 12
+        height = 6
+
+        properties = {
+          metrics = [
+            ["AWS/EFS", "StorageBytes", "FileSystemId", aws_efs_file_system.ghost_content.id, "StorageClass", "Total"]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = var.region
+          title   = "EFS - Storage Bytes"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 12
+        width  = 12
+        height = 6
+
+        properties = {
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", aws_db_instance.ghost.id]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = var.region
+          title   = "RDS - Database Connections"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 18
+        width  = 12
+        height = 6
+
+        properties = {
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", aws_db_instance.ghost.id]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = var.region
+          title   = "RDS - CPU Utilization"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 18
+        width  = 12
+        height = 6
+
+        properties = {
+          metrics = [
+            ["AWS/RDS", "ReadIOPS", "DBInstanceIdentifier", aws_db_instance.ghost.id],
+            [".", "WriteIOPS", ".", "."]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = var.region
+          title   = "RDS - Read/Write IOPS"
+        }
+      }
+    ]
+  })
 }
