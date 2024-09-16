@@ -24,7 +24,7 @@ You can do this task following the step-by-step instructions or you can provisio
 <img width="741" alt="image" src="https://github.com/user-attachments/assets/bce17cf0-8ce8-48eb-b014-acaf12e5e7a9">
 
 
-## Minimum observability requirements: 
+## Observability: 
 
 - Avg CPU utilization for EC2 instances in ASG
 - ECS Service CPU Utilization 
