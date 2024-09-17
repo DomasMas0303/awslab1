@@ -231,24 +231,6 @@ resource "aws_security_group_rule" "alb_to_ec2_pool" {
   security_group_id        = aws_security_group.alb.id
 }
 
-resource "aws_security_group_rule" "bastion_to_fargate" {
-  type                     = "egress"
-  from_port                = 0
-  to_port                  = 65535
-  protocol                 = "-1"  # All protocols
-  security_group_id        = aws_security_group.bastion.id
-  source_security_group_id = aws_security_group.fargate_pool.id
-}
-
-resource "aws_security_group_rule" "fargate_from_bastion" {
-  type                     = "ingress"
-  from_port                = 0
-  to_port                  = 65535
-  protocol                 = "-1"  # All protocols
-  security_group_id        = aws_security_group.fargate_pool.id
-  source_security_group_id = aws_security_group.bastion.id
-}
-
 # Create new SSH key
 resource "tls_private_key" "ghost_key" {
   algorithm = "RSA"
