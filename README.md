@@ -13,11 +13,7 @@
 - Use AWS CloudWatch to collect metrics and logs
 - Use Tags to mark all resources, e.g. 'Project'='CloudX'
 
-As the core application in this task we will use [Ghost](https://ghost.org/) - a leading platform for bloggers.
-You have to create complete infrastructure and deploy this application to it according to the statements above.
-
-You can do this task following the step-by-step instructions or you can provision infrastructure on your own using this solution explanation as the requirements and then refer to instructions for self check.
-
+As the core application we will use [Ghost](https://ghost.org/) - a leading platform for bloggers.
 
 ## Reference Infrastructure Diagram: 
 
